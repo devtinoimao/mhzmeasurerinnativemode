@@ -12,7 +12,7 @@ jobs:
 
       - name: Compile MHz App
         run: |
-          cl.exe /O2 /GS- /Tc mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
           
       - name: Upload Finished EXE
         uses: actions/upload-artifact@v4
