@@ -11,63 +11,73 @@ typedef struct _UNICODE_STRING {
     WCHAR* Buffer;
 } UNICODE_STRING, *PUNICODE_STRING;
 
-// ntdll imports
+// Native API Imports
 __declspec(dllimport) NTSTATUS __stdcall NtDisplayString(PUNICODE_STRING String);
 __declspec(dllimport) NTSTATUS __stdcall NtTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
 __declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const WCHAR* SourceString);
 
-// Simple Integer to WCHAR conversion (since we can't use swprintf)
-void IntToWStr(UINT64 n, WCHAR* str) {
+// Fixed-point math: Converts cycles to a "00.00 MHz" string
+void FormatMhzDecimal(UINT64 cycles, WCHAR* out_buf) {
+    // Math logic:
+    // If we sample for roughly 1 second:
+    // MHz = Cycles / 1,000,000
+    // To get 2 decimals, we calculate (Cycles / 10,000)
+    UINT64 mhz_x100 = cycles / 10000; 
+    UINT64 whole = mhz_x100 / 100;
+    UINT64 decimal = mhz_x100 % 100;
+
+    int pos = 0;
     WCHAR temp[20];
-    int i = 0, j = 0;
-    if (n == 0) temp[i++] = L'0';
-    while (n > 0) {
-        temp[i++] = (n % 10) + L'0';
-        n /= 10;
-    }
-    while (i > 0) str[j++] = temp[--i];
-    str[j] = L'\0';
+    int i = 0;
+
+    // Convert Whole number
+    if (whole == 0) temp[i++] = L'0';
+    while (whole > 0) { temp[i++] = (whole % 10) + L'0'; whole /= 10; }
+    while (i > 0) out_buf[pos++] = temp[--i];
+
+    out_buf[pos++] = L'.'; // Decimal dot
+
+    // Convert Decimal (padded to 2 digits)
+    out_buf[pos++] = (decimal / 10) + L'0';
+    out_buf[pos++] = (decimal % 10) + L'0';
+
+    // Labels
+    out_buf[pos++] = L' '; out_buf[pos++] = L'M'; out_buf[pos++] = L'H'; out_buf[pos++] = L'z';
+    out_buf[pos++] = L'\n'; // New line for a scrolling log
+    out_buf[pos++] = L'\0';
 }
 
-// Entry point for Native Subsystem
 void NtProcessStartup(PVOID StartupArgument) {
     UNICODE_STRING msg;
-    UINT64 start, end, mhz;
-    WCHAR mhz_buf[64];
-    WCHAR final_msg[128];
+    UINT64 start, end, diff;
+    WCHAR display_buf[64];
     
-    // 1. Initial Greeting
-    RtlInitUnicodeString(&msg, L"\nXP NATIVE FREQUENCY MONITOR\n---------------------------\n");
+    RtlInitUnicodeString(&msg, L"--- NATIVE MHZ SCROLLING LOG ---\n");
+    NtDisplayString(&msg);
+    RtlInitUnicodeString(&msg, L"Change DOSBox-X cycles now (F11/F12)...\n\n");
     NtDisplayString(&msg);
 
-    // 2. The Measurement Loop
-    // We will run this in a loop so it keeps updating until you "stop" it
-    for(int loops = 0; loops < 10; loops++) {
+    // Run for 50 updates
+    for(int i = 0; i < 50; i++) {
         start = __rdtsc();
-        // Delay loop for approx 1 second
-        for (volatile int i = 0; i < 200000000; i++); 
-        end = __rdtsc();
-
-        mhz = (end - start) / 1000000;
-
-        // Convert and Display
-        IntToWStr(mhz, mhz_buf);
         
-        // Manual string concatenation for the display
-        RtlInitUnicodeString(&msg, L"Current Speed: ");
-        NtDisplayString(&msg);
-        RtlInitUnicodeString(&msg, mhz_buf);
-        NtDisplayString(&msg);
-        RtlInitUnicodeString(&msg, L" MHz\n");
+        // This loop controls the "update rate". 
+        // In DOSBox-X, 100 million iterations is roughly 1 second at 100MHz.
+        for (volatile int d = 0; d < 100000000; d++); 
+        
+        end = __rdtsc();
+        diff = end - start;
+        
+        FormatMhzDecimal(diff, display_buf);
+        
+        RtlInitUnicodeString(&msg, display_buf);
         NtDisplayString(&msg);
     }
 
-    // 3. Exit sequence
-    RtlInitUnicodeString(&msg, L"\nMeasurement finished. Returning to Windows XP...\n");
+    RtlInitUnicodeString(&msg, L"\nLog finished. Continuing boot...");
     NtDisplayString(&msg);
-
-    // Final short pause so you can see the last result
-    for (volatile int i = 0; i < 300000000; i++);
-
+    
+    // Final wait so you can see the last line
+    for (volatile int d = 0; d < 200000000; d++);
     NtTerminateProcess((HANDLE)-1, 0);
 }
