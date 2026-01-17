@@ -1,0 +1,15 @@
+name: Build Native App
+on: [push]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Compile
+        run: |
+          cl.exe /O2 /GS- /Tc mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
+      - name: Upload result
+        uses: actions/upload-artifact@v3
+        with:
+          name: mhz-binary
+          path: mhz.exe
