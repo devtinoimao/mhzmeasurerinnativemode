@@ -1,21 +1,16 @@
 name: Build Native MHz Tool
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+      - uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x86  # Force x86 because XP is 32-bit
+          arch: x86 # Windows XP is 32-bit!
 
-      - name: Compile Native Binary
+      - name: Compile
         run: |
-          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /NODEFAULTLIB /STACK:0x400000,0x400000 /DYNAMICBASE:NO /FIXED ntdll.lib /out:mhz.exe
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /NODEFAULTLIB /MERGE:.rdata=.text ntdll.lib /out:mhz.exe
