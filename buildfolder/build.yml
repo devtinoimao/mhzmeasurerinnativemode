@@ -1,16 +1,32 @@
 name: Build Native MHz Tool
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x86 # Windows XP is 32-bit!
 
-      - name: Compile
+      - name: Setup MSVC (Force x86)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          # This forces the compiler to target 32-bit Windows XP
+          arch: x86 
+
+      - name: Compile Native Binary
         run: |
-          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /MACHINE:X86 /NODEFAULTLIB /FIXED /ALIGN:512 ntdll.lib /out:mhz.exe
+          # /subsystem:native,5.01 -> Targets the XP Native Subsystem
+          # /entry:NtProcessStartup -> Sets the correct entry point for ntdll
+          # /MACHINE:X86 -> Ensures the header is 32-bit (014C)
+          # /NODEFAULTLIB -> Removes dependencies on modern Windows DLLs
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /MACHINE:X86 /NODEFAULTLIB ntdll.lib /out:mhz.exe
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mhz-native-x86
+          path: mhz.exe
