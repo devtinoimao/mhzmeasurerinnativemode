@@ -13,4 +13,4 @@ jobs:
 
       - name: Compile
         run: |
-          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /NODEFAULTLIB /MACHINE:X86 ntdll.lib /out:mhz.exe
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /MACHINE:X86 /NODEFAULTLIB /FIXED /ALIGN:512 ntdll.lib /out:mhz.exe
