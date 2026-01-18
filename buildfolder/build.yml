@@ -13,13 +13,9 @@ jobs:
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86  # Force x86 because XP is 32-bit
 
       - name: Compile Native Binary
         run: |
-          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mhz-native-binary
-          path: mhz.exe
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native,5.01 /entry:NtProcessStartup /NODEFAULTLIB /STACK:0x400000,0x400000 /DYNAMICBASE:NO /FIXED ntdll.lib /out:mhz.exe
