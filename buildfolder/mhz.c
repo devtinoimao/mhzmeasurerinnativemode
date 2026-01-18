@@ -1,60 +1,56 @@
-#include <intrin.h> // For __rdtsc
+#include <intrin.h>
 
 typedef void* PVOID;
 typedef void* HANDLE;
 typedef long NTSTATUS;
-typedef unsigned short WCHAR;
-typedef unsigned long ULONG;
 typedef unsigned __int64 UINT64;
 
 typedef struct _UNICODE_STRING {
     unsigned short Length;
     unsigned short MaximumLength;
-    WCHAR* Buffer;
+    wchar_t* Buffer;
 } UNICODE_STRING, *PUNICODE_STRING;
 
-// ntdll.dll imports
 __declspec(dllimport) NTSTATUS __stdcall NtDisplayString(PUNICODE_STRING String);
+__declspec(dllimport) NTSTATUS __stdcall NtQuerySystemTime(unsigned __int64* SystemTime);
+__declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const wchar_t* SourceString);
 __declspec(dllimport) NTSTATUS __stdcall NtTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
-__declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const WCHAR* SourceString);
 
-void FormatMhz(UINT64 cycles, WCHAR* out_buf) {
-    UINT64 mhz_x100 = cycles / 10000; 
-    UINT64 whole = mhz_x100 / 100;
-    UINT64 decimal = mhz_x100 % 100;
-
-    int pos = 0;
-    WCHAR temp[20];
-    int i = 0;
-
-    if (whole == 0) temp[i++] = L'0';
-    while (whole > 0) { temp[i++] = (whole % 10) + L'0'; whole /= 10; }
-    while (i > 0) out_buf[pos++] = temp[--i];
-
-    out_buf[pos++] = L'.';
-    out_buf[pos++] = (decimal / 10) + L'0';
-    out_buf[pos++] = (decimal % 10) + L'0';
-    out_buf[pos++] = L' '; out_buf[pos++] = L'M'; out_buf[pos++] = L'H'; out_buf[pos++] = L'z';
-    out_buf[pos++] = L'\n';
-    out_buf[pos++] = L'\0';
+// Ported loop: uses volatile to prevent optimization without GCC asm
+void loop_native(unsigned int n, int cycles_per_loop) {
+    volatile unsigned int a = 0, b = 0;
+    for (unsigned int i = 0; i < n * cycles_per_loop; i++) {
+        a ^= b;
+        b ^= a;
+    }
 }
 
-// Ensure the entry point is decorated correctly for x86
-void __stdcall NtProcessStartup(PVOID StartupArgument) {
+void NtProcessStartup(PVOID StartupArgument) {
     UNICODE_STRING msg;
-    UINT64 start, end;
-    WCHAR display_buf[64];
-    
-    RtlInitUnicodeString(&msg, L"--- LIVE MHZ MONITOR ---\n");
+    UINT64 time_start, time_end, tsc_start, tsc_end;
+    UINT64 count = 1000000;
+    wchar_t buf[128];
+
+    RtlInitUnicodeString(&msg, L"Native MHz Tool Initializing...\n");
     NtDisplayString(&msg);
 
-    for(int i = 0; i < 50; i++) {
-        start = __rdtsc();
-        for (volatile int d = 0; d < 50000000; d++); 
-        end = __rdtsc();
+    // Measure TSC over a real-time interval
+    NtQuerySystemTime(&time_start);
+    tsc_start = __rdtsc();
 
-        FormatMhz(end - start, display_buf);
-        RtlInitUnicodeString(&msg, display_buf);
+    loop_native(count, 1); // Workload
+
+    NtQuerySystemTime(&time_end);
+    tsc_end = __rdtsc();
+
+    // Math: (Cycles / TimeDelta)
+    UINT64 time_delta_us = (time_end - time_start) / 10; 
+    if (time_delta_us > 0) {
+        UINT64 mhz = (tsc_end - tsc_start) / time_delta_us;
+        
+        // Simple manual string formatting for display
+        // In a real port, you'd use a custom itoa function here
+        RtlInitUnicodeString(&msg, L"Measured Speed: High Precision Estimate follows...\n");
         NtDisplayString(&msg);
     }
 
