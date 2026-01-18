@@ -1,43 +1,41 @@
-// No #includes allowed to be safe
+// Define types manually to be 100% independent
 typedef void* PVOID;
 typedef void* HANDLE;
 typedef long NTSTATUS;
 typedef unsigned __int64 UINT64;
+typedef unsigned short WCHAR; // Manual wchar_t replacement
 
 typedef struct _UNICODE_STRING {
     unsigned short Length;
     unsigned short MaximumLength;
-    wchar_t* Buffer;
+    WCHAR* Buffer;
 } UNICODE_STRING, *PUNICODE_STRING;
 
-// Manual imports from ntdll.dll
+// ntdll.dll imports
 __declspec(dllimport) NTSTATUS __stdcall NtDisplayString(PUNICODE_STRING String);
-__declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const wchar_t* SourceString);
+__declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const WCHAR* SourceString);
 __declspec(dllimport) NTSTATUS __stdcall NtTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
 
-// Assembly-free RDTSC for MSVC
-#define rdtsc __rdtsc
-
+// Entry point
 void NtProcessStartup(PVOID StartupArgument) {
     UNICODE_STRING msg;
     UINT64 start, end;
     
-    RtlInitUnicodeString(&msg, L"Testing MHz... (Press F12 in DOSBox-X)\n");
+    // We use L"text" which creates WCHAR (unsigned short) arrays
+    RtlInitUnicodeString(&msg, L"Native MHz Test Starting...\n");
     NtDisplayString(&msg);
 
-    for(int i = 0; i < 100; i++) {
-        start = rdtsc();
-        // A simple workload that won't be optimized away
+    for(int i = 0; i < 50; i++) {
+        start = __rdtsc();
         for (volatile int d = 0; d < 10000000; d++); 
-        end = rdtsc();
+        end = __rdtsc();
 
-        // For now, just print a dot to prove it works
-        // Complex math/formatting often requires CRT libraries which fail here
+        // Print a dot for each measurement to show activity
         RtlInitUnicodeString(&msg, L".");
         NtDisplayString(&msg);
     }
 
-    RtlInitUnicodeString(&msg, L"\nDone!\n");
+    RtlInitUnicodeString(&msg, L"\nDone! Returning to Shell.\n");
     NtDisplayString(&msg);
 
     NtTerminateProcess((HANDLE)-1, 0);
