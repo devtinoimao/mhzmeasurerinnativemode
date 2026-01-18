@@ -1,3 +1,5 @@
+#include <intrin.h> // For __rdtsc
+
 typedef void* PVOID;
 typedef void* HANDLE;
 typedef long NTSTATUS;
@@ -16,7 +18,6 @@ __declspec(dllimport) NTSTATUS __stdcall NtDisplayString(PUNICODE_STRING String)
 __declspec(dllimport) NTSTATUS __stdcall NtTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
 __declspec(dllimport) void __stdcall RtlInitUnicodeString(PUNICODE_STRING DestinationString, const WCHAR* SourceString);
 
-// Simple Fixed-point math to avoid floating point libraries
 void FormatMhz(UINT64 cycles, WCHAR* out_buf) {
     UINT64 mhz_x100 = cycles / 10000; 
     UINT64 whole = mhz_x100 / 100;
@@ -38,19 +39,18 @@ void FormatMhz(UINT64 cycles, WCHAR* out_buf) {
     out_buf[pos++] = L'\0';
 }
 
-// THE NATIVE ENTRY POINT
-void NtProcessStartup(PVOID StartupArgument) {
+// Ensure the entry point is decorated correctly for x86
+void __stdcall NtProcessStartup(PVOID StartupArgument) {
     UNICODE_STRING msg;
-    UINT64 start, end, diff;
+    UINT64 start, end;
     WCHAR display_buf[64];
     
     RtlInitUnicodeString(&msg, L"--- LIVE MHZ MONITOR ---\n");
     NtDisplayString(&msg);
 
-    // Run for 100 iterations
-    for(int i = 0; i < 100; i++) {
+    for(int i = 0; i < 50; i++) {
         start = __rdtsc();
-        for (volatile int d = 0; d < 100000000; d++); // Timing loop
+        for (volatile int d = 0; d < 50000000; d++); 
         end = __rdtsc();
 
         FormatMhz(end - start, display_buf);
@@ -58,6 +58,5 @@ void NtProcessStartup(PVOID StartupArgument) {
         NtDisplayString(&msg);
     }
 
-    // Hand control back to the Shell/Session Manager
     NtTerminateProcess((HANDLE)-1, 0);
 }
