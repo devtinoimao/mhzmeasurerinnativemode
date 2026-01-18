@@ -1,21 +1,25 @@
-name: Native Compiler
-on: [push] # This triggers the build every time you save a change
+name: Build Native MHz Tool
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build_native_exe:
+  build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Compile MHz App
+      - name: Compile Native Binary
         run: |
-          cl.exe /O2 /GS- /Tc mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
-          
-      - name: Upload Finished EXE
+          cl.exe /O2 /GS- /Tc buildfolder/mhz.c /link /subsystem:native /entry:NtProcessStartup ntdll.lib /out:mhz.exe
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mhz-binary
+          name: mhz-native-binary
           path: mhz.exe
